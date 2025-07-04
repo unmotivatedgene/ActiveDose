@@ -129,6 +129,12 @@
       renderMedicineList();
     }
 
+    function removeMedicine(name) {
+      delete medicines[name];
+      render();
+      renderMedicineList();
+    }
+
     function loadDefaults(name) {
       if (!medicines[name] || medicines[name].length === 0) return;
       const last = medicines[name][medicines[name].length - 1];
@@ -145,7 +151,8 @@
       list.innerHTML = "";
       Object.keys(medicines).forEach(name => {
         const header = document.createElement("div");
-        header.innerHTML = `<h3>${name} <button onclick="loadDefaults('${name}')">+Dose</button></h3>`;
+        const safeName = name.replace(/"/g, '&quot;');
+        header.innerHTML = `<h3>${name} <button onclick="loadDefaults('${safeName}')">+Dose</button> <button onclick="removeMedicine('${safeName}')">Remove Medicine</button></h3>`;
         list.appendChild(header);
 
         medicines[name].forEach((entry, idx) => {
@@ -154,7 +161,7 @@
           div.className = "medicine-entry";
           div.innerHTML = `Dose: ${entry.dose} mg, Day 1: ${entry.startDay}, Half-life: ${entry.halfLife} days, Interval: ${entry.interval} days, Repeats: ${entry.numDoses}<br>
             Next Dose (if Continued): Day ${nextDose}<br>
-            <button onclick="editDose('${name}', ${idx})">Remove+Edit</button>`;
+            <button onclick="editDose('${safeName}', ${idx})">Remove+Edit</button>`;
           list.appendChild(div);
         });
       });
