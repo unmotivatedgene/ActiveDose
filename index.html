@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Medicine Dose Simulator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      margin: 2rem;
+      background: #f9f9f9;
+      color: #333;
+    }
+    label {
+      display: inline-block;
+      margin: 0.25rem 1rem 0.25rem 0;
+    }
+    input {
+      padding: 0.25rem;
+      font-size: 1rem;
+      width: 6rem;
+    }
+    button {
+      padding: 0.4rem 1rem;
+      font-size: 1rem;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      margin-right: 0.5rem;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .medicine-entry {
+      background: #fff;
+      margin-bottom: 1rem;
+      border-left: 4px solid #007bff;
+      padding: 0.5rem 1rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      background: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 0.5rem;
+      text-align: right;
+    }
+    th {
+      background: #f0f0f0;
+    }
+    h1, h2 {
+      color: #007bff;
+    }
+  </style>
+</head>
+<body>
+  <h1>Medicine Dose Simulator</h1>
+
+  <div>
+    <label>Medicine Name: <input id="medName" type="text"></label>
+    <label>Dose 1 (mg): <input id="dose" type="number" step="any"></label>
+    <label>Day 1: <input id="startDay" type="number"></label>
+    <label>Half-life (days): <input id="halfLife" type="number" step="any"></label>
+    <label>Repeat Interval (days): <input id="interval" type="number"></label>
+    <label>Number of Doses: <input id="numDoses" type="number"></label>
+    <br>
+    <button onclick="addOrUpdateDose()">Add Dose</button>
+  </div>
+
+  <h2>Dose Entries</h2>
+  <div id="medicineList"></div>
+
+  <h2>Chart</h2>
+  <canvas id="chart" width="800" height="400"></canvas>
+
+  <h2>Table</h2>
+  <div id="output"></div>
+
+  <script>
+    const medicines = {};
+
+    function addOrUpdateDose() {
+      const name = document.getElementById("medName").value.trim();
+      const dose = parseFloat(document.getElementById("dose").value);
+      const startDay = parseInt(document.getElementById("startDay").value);
+      const halfLife = parseFloat(document.getElementById("halfLife").value);
+      const interval = parseInt(document.getElementById("interval").value);
+      const numDoses = parseInt(document.getElementById("numDoses").value);
+
+      if (!name || isNaN(dose) || isNaN(startDay) || isNaN(halfLife) || isNaN(interval) || isNaN(numDoses)) {
+        alert("Please fill all fields with valid numbers.");
+        return;
+      }
+
+      if (!medicines[name]) medicines[name] = [];
+      medicines[name].push({ dose, startDay, halfLife, interval, numDoses });
+
+      render();
+      renderMedicineList();
+    }
+
+    function editDose(medName, index) {
+      const d = medicines[medName][index];
+      document.getElementById("medName").value = medName;
+      document.getElementById("dose").value = d.dose;
+      document.getElementById("startDay").value = d.startDay;
+      document.getElementById("halfLife").value = d.halfLife;
+      document.getElementById("interval").value = d.interval;
+      document.getElementById("numDoses").value = d.numDoses;
+      medicines[medName].splice(index, 1);
+      render();
+      renderMedicineList();
+    }
+
+    function loadDefaults(name) {
+      if (!medicines[name] || medicines[name].length === 0) return;
+      const last = medicines[name][medicines[name].length - 1];
+      document.getElementById("medName").value = name;
+      document.getElementById("dose").value = last.dose;
+      document.getElementById("startDay").value = last.startDay + last.interval * last.numDoses;
+      document.getElementById("halfLife").value = last.halfLife;
+      document.getElementById("interval").value = last.interval;
+      document.getElementById("numDoses").value = last.numDoses;
+    }
+
+    function renderMedicineList() {
+      const list = document.getElementById("medicineList");
+      list.innerHTML = "";
+      Object.keys(medicines).forEach(name => {
+        const header = document.createElement("div");
+        header.innerHTML = `<h3>${name} <button onclick="loadDefaults('${name}')">+Dose</button></h3>`;
+        list.appendChild(header);
+
+        medicines[name].forEach((entry, idx) => {
+          const nextDose = entry.startDay + entry.interval * entry.numDoses;
+          const div = document.createElement("div");
+          div.className = "medicine-entry";
+          div.innerHTML = `Dose: ${entry.dose} mg, Day 1: ${entry.startDay}, Half-life: ${entry.halfLife} days, Interval: ${entry.interval} days, Repeats: ${entry.numDoses}<br>
+            Next Dose (if Continued): Day ${nextDose}<br>
+            <button onclick="editDose('${name}', ${idx})">Remove+Edit</button>`;
+          list.appendChild(div);
+        });
+      });
+    }
+
+    function calcConcentration(dose, halfLife, elapsedDays) {
+      return dose * Math.exp(-Math.log(2) * elapsedDays / halfLife);
+    }
+
+    function render() {
+      const output = document.getElementById("output");
+      let html = '<table><thead><tr><th>Day</th>';
+      const medNames = Object.keys(medicines);
+      medNames.forEach(name => html += `<th>${name} (mg)</th>`);
+      html += '</tr></thead><tbody>';
+
+      const chartData = [];
+      const labels = [];
+
+      for (let day = 0; day <= 60; day++) {
+        labels.push(day);
+        html += `<tr><td>${day}</td>`;
+        const rowData = [];
+
+        medNames.forEach(name => {
+          const total = medicines[name].reduce((sum, entry) => {
+            for (let i = 0; i < entry.numDoses; i++) {
+              const doseDay = entry.startDay + i * entry.interval;
+              const elapsed = day - doseDay;
+              if (elapsed >= 0) {
+                sum += calcConcentration(entry.dose, entry.halfLife, elapsed);
+              }
+            }
+            return sum;
+          }, 0);
+          rowData.push(total.toFixed(2));
+          html += `<td>${total.toFixed(2)}</td>`;
+        });
+
+        chartData.push(rowData);
+        html += '</tr>';
+      }
+
+      html += '</tbody></table>';
+      output.innerHTML = html;
+
+      renderChart(labels, chartData, medNames);
+    }
+
+    let chartInstance;
+    function renderChart(labels, data, medNames) {
+      const datasets = medNames.map((name, idx) => ({
+        label: name,
+        data: data.map(row => parseFloat(row[idx])),
+        fill: false,
+        borderColor: `hsl(${(idx * 70) % 360}, 70%, 50%)`,
+        tension: 0.1
+      }));
+
+      const ctx = document.getElementById("chart").getContext("2d");
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              title: {
+                display: true,
+                text: 'Concentration (mg)'
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: 'Day'
+              }
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                title: (items) => `Day ${items[0].label}`,
+                label: (item) => `${item.dataset.label}: ${item.formattedValue} mg`
+              }
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
