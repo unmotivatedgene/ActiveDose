@@ -60,6 +60,12 @@
     h1, h2 {
       color: #007bff;
     }
+    #shareLink {
+      margin-top: 1rem;
+      display: block;
+      font-size: 0.9rem;
+      color: #555;
+    }
   </style>
 </head>
 <body>
@@ -74,6 +80,8 @@
     <label>Number of Doses: <input id="numDoses" type="number"></label>
     <br>
     <button onclick="addOrUpdateDose()">Add Dose</button>
+    <button onclick="generateShareLink()">Generate Share Link</button>
+    <div id="shareLink"></div>
   </div>
 
   <h2>Dose Entries</h2>
@@ -150,6 +158,27 @@
           list.appendChild(div);
         });
       });
+    }
+
+    function generateShareLink() {
+      const encoded = encodeURIComponent(btoa(JSON.stringify(medicines)));
+      const url = `${location.origin}${location.pathname}?data=${encoded}`;
+      document.getElementById("shareLink").innerHTML = `<a href="${url}">${url}</a>`;
+    }
+
+    function loadFromUrl() {
+      const params = new URLSearchParams(location.search);
+      const data = params.get("data");
+      if (data) {
+        try {
+          const decoded = JSON.parse(atob(decodeURIComponent(data)));
+          Object.assign(medicines, decoded);
+          render();
+          renderMedicineList();
+        } catch (e) {
+          alert("Invalid shared data.");
+        }
+      }
     }
 
     function calcConcentration(dose, halfLife, elapsedDays) {
@@ -238,6 +267,9 @@
         }
       });
     }
+
+    // Load shared data if available
+    loadFromUrl();
   </script>
 </body>
 </html>
